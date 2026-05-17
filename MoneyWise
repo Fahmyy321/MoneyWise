@@ -1,0 +1,505 @@
+#============================
+#MoneyWise - Financial Literacy App
+#Kategori: High Scholl (Python)
+#
+#Deskripsi: MoneyWise merupakan aplikasi yang membantu pengguna untuk mengelola keungan,
+#mencatat pemasukan dan pengeluaran.
+#
+#Fitur:
+#-Register & Login
+#-Top Up(50/30/20)
+#-Pengeluaran
+#-Riwayat Transaksi
+#-Saving goals
+#-Bill Remember
+#-Analisis keuangan
+
+# ===== Import =====
+import os
+from datetime import datetime
+import json
+
+# ===== Clear Tampilan =====
+def clear():
+    os.system("cls" if os.name == "nt" else "clear")
+
+# ===== Data User =====
+data_user = {}
+kategori_list = ["Listrik", "Air", "Wifi", "Makan", "Transportasi", "Belanja", "Hiburan"]
+
+# ===== Simpan data ke file =====
+def save_data():
+    with open("budget_data.json", "w") as f:
+        json.dump(data_user, f, indent=2, default=str)
+
+# ===== Load data dari file =====
+def load_data():
+    global data_user
+    try:
+        with open("budget_data.json", "r") as f:
+            data_user = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        data_user = {}
+
+# ===== Register =====
+def register():
+    print("\n==== Register === ")
+   
+    username = input("Silahkan Masukan Username Anda: ").strip()
+    
+    if not username:
+        print("❌username tidak boleh kosong!")
+        return
+
+    if username in data_user:
+        print("❌ Username sudah dipakai")
+        return 
+
+    while True:
+        password = input("Silahkan Masukan Password Anda: ").strip()
+        valid, pesan = validasi_password(password)
+    
+        if valid:
+            break
+        else:
+            print(f"❌ {pesan}")
+
+    
+    data_user[username] = {
+        "password": password,
+        "wallet": {
+            "kebutuhan": 0,
+            "tabungan": 0,
+            "keinginan": 0
+        },
+        "transaksi": [],
+        "bills": [],
+        "saving_goals": []
+    }
+    save_data()
+
+    print("✅ Akun berhasil dibuat!")
+
+# ===== validasi password =====
+def validasi_password(password):
+    if len(password) <8:
+        return False, "Password minimal 8 karakter!"
+    
+    has_upper = any(c.isupper() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    has_symbol = any(not c.isalnum() for c in password)
+    
+    if not has_upper:
+        return False, "Harus ada huruf kapital!"
+    if not has_digit:
+        return False, "Harus ada angka!"
+    if not has_symbol:
+        return False, "Harus ada simbol!"
+    
+    return True, "OK"
+
+# ===== Login =====
+def login():
+    print("\n=== Login === ")
+    username = input("Login Username: ").strip()
+    password = input("Login Password: ").strip()
+
+    if username in data_user and data_user[username]["password"] == password:
+        print("✅ Login Berhasil")
+        return username
+    else:
+        print("❌ Login Gagal")
+        return None
+
+# ===== Saldo =====
+def lihat_saldo(user):
+    print("\n💰 SALDO DOMPET")
+    print("=" * 30)
+    print(f"Kebutuhan   : Rp {user['wallet']['kebutuhan']:,.0f}")
+    print(f"Tabungan    : Rp {user['wallet']['tabungan']:,.0f}")
+    print(f"Keinginan   : Rp {user['wallet']['keinginan']:,.0f}")
+    print(f"TOTAL       : Rp {sum(user['wallet'].values()):,.0f}")
+    print("=" * 30)
+
+# ===== Topup =====
+def topup(user):
+    print("\n💵 TOPUP")
+    try:
+        jumlah = int(input("Masukkan jumlah topup: Rp "))
+        if jumlah <= 0:
+            print("❌ Jumlah harus lebih dari 0")
+            return
+            
+        user["wallet"]["kebutuhan"] += int(jumlah * 0.5)
+        user["wallet"]["tabungan"] += int(jumlah * 0.3)
+        user["wallet"]["keinginan"] += int(jumlah * 0.2)
+        
+        user["transaksi"].append({
+            "tipe": "topup",
+            "jumlah": jumlah,
+            "tanggal": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+        
+        print(f"✅ Topup Rp {jumlah:,.0f} berhasil!")
+        print(f"   Kebutuhan: +Rp {jumlah*0.5:,.0f}")
+        print(f"   Tabungan : +Rp {jumlah*0.3:,.0f}")
+        print(f"   Keinginan: +Rp {jumlah*0.2:,.0f}")
+        save_data()
+    except ValueError:
+        print("❌ Harus masukkan angka!")
+
+# ===== Withdraw/Pengeluaran =====
+def withdraw(user):
+    print("\n💸 WITHDRAW/PENGELUARAN")
+    print("Pilih dompet:")
+    print("1. Kebutuhan")
+    print("2. Tabungan")
+    print("3. Keinginan")
+    
+    pilih = input("Pilih (1-3): ").strip()
+    
+    if pilih == "1":
+        dompet = "kebutuhan"
+    elif pilih == "2":
+        dompet = "tabungan"
+    elif pilih == "3":
+        dompet = "keinginan"
+    else:
+        print("❌ Pilihan tidak valid!")
+        return
+    
+    print("\nKategori Pengeluaran:")
+    for i, kat in enumerate(kategori_list, 1):
+        print(f"{i}. {kat}")
+    print(f"{len(kategori_list)+1}. Lainnya")
+    
+    try:
+        kat_pilih = int(input("Pilih kategori (1-{}): ".format(len(kategori_list)+1)))
+    except ValueError:
+        print("❌ Harus angka!")
+        return
+    
+    if kat_pilih < 1 or kat_pilih > len(kategori_list) + 1:
+        print("❌ Kategori tidak valid!")
+        return
+    
+    if kat_pilih == len(kategori_list) + 1:
+        kategori = input("Masukkan kategori custom: ").strip()
+    else:
+        kategori = kategori_list[kat_pilih - 1]
+       
+    try:   
+        jumlah = int(input("Jumlah pengeluaran: Rp "))
+        catatan = input("Masukan Catatan: ").strip()
+    except ValueError:
+        print("❌ Harus angka!")
+        return
+        
+    if jumlah <= 0:
+        print("❗ Jumlah harus lebih dari 0! ")
+        return
+        
+    if user["wallet"][dompet] < jumlah:
+        print("❌ Saldo tidak mencukupi!")
+        return
+      
+      # ===== Limit Harian Pengeluaran =====
+        
+    limit_harian = int(user["wallet"].get("keinginan", 0) / 30)
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    if limit_harian <20000:
+        limit_harian = 20000
+        
+    total_hari_ini = sum(t.get("jumlah", 0) for t in user["transaksi"]
+         if t.get("tipe") == "pengeluaran" and t.get("dompet") == "keinginan" and t.get("tanggal", "").startswith(today))
+        
+    print(f"📊 Pemakaian hari ini: Rp {total_hari_ini:,.0f} / Rp{limit_harian:,.0f}")
+        
+    if dompet == "keinginan" and total_hari_ini < limit_harian * 0.8 and total_hari_ini + jumlah > limit_harian * 0.8:
+        print("⚠ Kamu hampir mencapai limit harian!")
+        
+    if dompet == "keinginan" and total_hari_ini + jumlah > limit_harian:
+        sisa = max(0,limit_harian - total_hari_ini)
+        print("🚫 Limit Harian Telah Tercapai!")
+        print(f"💡 sisa limit hari ini: Rp {sisa:,.0f}")
+        print(f"📊 Pemakaian hari ini: Rp {total_hari_ini:,.0f} / Rp {limit_harian:,.0f}")
+        return
+    if dompet not in user["wallet"]:
+        print("❌ Dompet tidak valid")
+        return        
+    
+    user["wallet"][dompet] -= jumlah
+    
+    user["transaksi"].append({
+        "tipe": "pengeluaran",
+        "dompet": dompet,
+        "kategori": kategori,
+        "jumlah": jumlah,
+        "catatan": catatan,
+        "tanggal": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+        
+    print(f"✅ Pengeluaran Rp {jumlah:,.0f} ({kategori}) berhasil!")
+    print(f"Catatan:", catatan)
+    save_data()
+
+# ===== Riwayat Transaksi =====
+def riwayat_transaksi(user):
+    print("\n📊 RIWAYAT TRANSAKSI ")
+    print("=" * 80)
+    print(f"{'Tanggal':<20} {'Tipe':<12} {'Dompet':<10} {'Kategori':<12} {'Jumlah':<12} {'Saldo':<12}")
+    print("-" * 80)
+    
+    total_pengeluaran = 0
+    for transaksi in user["transaksi"][-10:]:  # 10 transaksi terakhir
+        if transaksi["tipe"] == "topup":
+            print(f"{transaksi['tanggal'][:16]:<20} {transaksi['tipe'].upper():<12} {'-':<10} {'-':<12} +Rp {transaksi['jumlah']:>10,} {'':<12}")
+        elif transaksi["tipe"] == "pengeluaran":
+            total_pengeluaran += transaksi["jumlah"]
+            dompet_nama = transaksi["dompet"].title()
+            print(f"{transaksi['tanggal'][:16]:<20} {transaksi['tipe'].upper():<12} {dompet_nama:<10} {transaksi['kategori']:<12} -Rp {transaksi['jumlah']:>10,} {'':<12}")
+        elif transaksi["tipe"] == "saving":
+            print(f"{transaksi['tanggal'][:16]:<20} SAVING{'':<6} {transaksi['goal']:<12} -Rp {transaksi['jumlah']:>10} {'':<12}")
+
+    
+    print("-" * 80)
+    print(f"TOTAL PENGELUARAN 10 TERAKHIR: Rp {total_pengeluaran:>38,}")
+    
+#analisis pengeluaran
+def analisis_boros(user):
+    print("\n🧠ANALISIS PENGELUARAN")
+    print("=" * 40)
+    
+    rekap = {}
+    
+    for t in user["transaksi"]:
+        if t.get("tipe") == "pengeluaran":
+            kategori = t.get("kategori", "lainnya")
+            rekap[kategori] = rekap.get(kategori, 0) + t["jumlah"]
+            
+    if not rekap:
+         print("Belum ada data pengeluaran")
+         return
+     
+    paling_boros = max(rekap, key=rekap.get)
+            
+    print(f"💸 Kategori Paling Boros: {paling_boros}")
+    print(f"💰 Total: Rp {rekap[paling_boros]:,.0f}")
+            
+    print("\n📊 Detail:")
+    for k, v in rekap.items():
+        print(f"{k:<15} : Rp {v:,.0f}")
+                
+    if paling_boros.lower() == "makan":
+        print("🍔 Kamu terlalu sering jajan nih😅")
+    elif paling_boros.lower() == "hiburan":
+         print("🎮 pengeluaran hiburan cukup tinggi!")
+    
+
+# ====== Bill Reminder ======
+def bill_reminder(user):
+    print("\n⏰ BILL REMINDER")
+    print("=" * 40)
+    
+    if not user["bills"]:
+        print("Belum ada bill yang dijadwalkan")
+        tambah = input("Tambah bill? (ya/tidak): ").lower()
+        if tambah == 'ya':
+            tambah_bill(user)
+    else:
+        for i, bill in enumerate(user["bills"]):
+            status = "⏰" if bill["tanggal_due"] == datetime.now().strftime("%Y-%m-%d") else "📅"
+            print(f"{i+1}. {status} {bill['nama']} - Rp {bill['jumlah']:,.0f} ({bill['tanggal_due']})")
+        
+        if input("\nTambah bill baru? (ya/tidak): ").lower() == 'ya':
+            tambah_bill(user)
+
+def tambah_bill(user):
+    nama = input("Nama bill (Listrik/Wifi dll): ").strip()
+    try:
+        jumlah = int(input("Jumlah: Rp "))
+        if jumlah <= 0:
+            print("❌ jumlah harus lebih dari 0!")
+            return
+    
+        tanggal = input("Tanggal due(%Y-%m-%d): ").strip()
+        
+        user["bills"].append({
+            "nama": nama,
+            "jumlah": jumlah,
+            "tanggal_due": tanggal
+        })
+        save_data()
+        print("✅ Bill berhasil ditambahkan!")
+    except ValueError:
+        print("❌ Format tidak valid!")
+
+# ===== Saving Goals =====
+def saving_goals(user):
+    print("\n💎 SAVING GOALS")
+    print("=" * 40)
+    
+    if not user["saving_goals"]:
+        print("Belum ada target saving")
+    if input("\nKelola saving goals? (ya/tidak): ").lower() == 'ya':
+        kelola_saving(user)
+
+def kelola_saving(user):
+    print("\n1. Tambah target saving")
+    print("2. Tambah saving")
+    print("3. Hapus target")
+    
+
+    pilihan = input("Pilih: ").strip()
+    
+    if pilihan == "1":
+        nama = input("Nama target (Liburan/Mobil dll): ").strip()
+        try:
+            target = int(input("Target amount: Rp "))
+            if target <= 0:
+                print("❌ Target harus lebih dari 0!")
+                return
+        except ValueError:
+            print("❌ input harus angka!")
+            return
+        
+        user["saving_goals"].append({
+            "nama": nama,
+            "target": target,
+            "current": 0
+        })
+        print("✅ Target saving ditambahkan!")
+    
+    elif pilihan == "2":
+        if not user["saving_goals"]:
+            print("❌ Belum ada target saving")
+            return
+        
+        for i, goal in enumerate(user["saving_goals"]):
+            if goal["target"] == 0:
+                progress = 0
+            else:
+                progress = min((goal["current"] / goal["target"]) * 100, 100)
+            
+            print(f"{goal['nama']}: Rp {goal['current']:,.0f}/{goal['target']:,.0f} ({progress:.1f}%)")
+        
+        try:
+            idx = int(input("Pilih Target (nomor): ")) - 1
+            
+            if idx < 0 or idx >= len(user["saving_goals"]):
+                print("❌ Pilihan tidak valid!")
+                return
+            
+            jumlah = int(input("Jumlah Saving: Rp "))
+            if jumlah <= 0:
+                print("❌ Jumlah harus lebih dari 0!")
+                return
+            
+        except ValueError:
+            print("❌ Input tidak valid")
+            return
+            
+        if user["wallet"]["tabungan"] < jumlah:
+            print("❌ Tabungan tidak mencukupi!")
+            return
+            
+        user["wallet"]["tabungan"] -= jumlah
+        user["saving_goals"][idx]["current"] += jumlah
+            
+        user["transaksi"].append({
+            "tipe": "saving",
+            "goal": user["saving_goals"][idx]["nama"],
+            "jumlah": jumlah,
+            "tanggal": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+            
+        print("✅ Saving berhasil ditambahkan!")
+        save_data()
+          
+    elif pilihan == "3":
+        if not user["saving_goals"]:
+            print("❌ Tidak ada target untuk dihapus")
+            return
+        for i, goal in enumerate(user["saving_goals"]):
+            print(f"{i+1}.  {goal['nama']}")
+            
+        try:
+            idx = int(input("Pilih target yang ingin dihapus: ")) - 1
+                
+            if idx < 0 or idx >= len(user["saving_goals"]):
+                print("❌ Pilihan tidak valid!")
+                return
+                
+            deleted = user["saving_goals"].pop(idx)
+            print(f"🗑 Target '{deleted['nama']}' berhasil dihapus!")
+            save_data()
+                
+        except ValueError:
+            print("❌ input tidak valid!")
+
+# ===== Menu Utama =====
+def main_menu(username):
+    while True:
+        clear()
+        print(f"\n👛 MONEYWISE - {username.upper()}")
+        print("=" * 50)
+        lihat_saldo(data_user[username])
+        print("\n1. 💵 Topup")
+        print("2. 💸 Pengeluaran")
+        print("3. 📊 Riwayat Transaksi")
+        print("4. ⏰ Bill Reminder")
+        print("5. 💎 Saving Goals")
+        print("6. 🧠 Analisis Pengeluaran")
+        print("7. ❌ Logout")
+        
+        pilihan = input("\nPilih menu: ").strip()
+        
+        if pilihan == "1":
+            topup(data_user[username])
+        elif pilihan == "2":
+            withdraw(data_user[username])
+        elif pilihan == "3":
+            riwayat_transaksi(data_user[username])
+        elif pilihan == "4":
+            bill_reminder(data_user[username])
+        elif pilihan == "5":
+            saving_goals(data_user[username])
+        elif pilihan == "6":
+            analisis_boros(data_user[username])
+        elif pilihan == "7":
+            print("👋 Terima kasih!")
+            break
+        else:
+            print("❌ Pilihan tidak valid!")
+        
+        input("\nTekan Enter untuk melanjutkan...")
+
+# ====== Program Utama ======
+if __name__ == "__main__":
+    load_data()
+    
+    while True:
+        clear()
+        print("🎯 MONEYWISE - AUTHENTICATION")
+        print("=" * 30)
+        print("1. 📝 Register")
+        print("2. 🔐 Login")
+        print("3. ❌ Keluar")
+        
+        pilihan = input("\nPilih: ").strip()
+        
+        if pilihan == "1":
+            register()
+        elif pilihan == "2":
+            user = login()
+            if user:
+                main_menu(user)
+        elif pilihan == "3":
+            print("👋 Selamat tinggal!")
+            break
+        else:
+            print("❌ Pilihan tidak valid!")
+        
+        input("\nTekan Enter untuk melanjutkan...")
+        
